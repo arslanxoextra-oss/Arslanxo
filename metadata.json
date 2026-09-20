@@ -1,0 +1,6 @@
+{
+  "name": "PromptXo",
+  "description": "Discover and generate AI prompts for video, text, and image creation with multi-step prompt builder.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
