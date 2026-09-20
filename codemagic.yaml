@@ -7,6 +7,7 @@ workflows:
       java: 17
 
     scripts:
+
       - name: Install Gradle 9.3.1
         script: |
           curl -L https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o gradle.zip
@@ -15,10 +16,24 @@ workflows:
           export PATH="$GRADLE_HOME/bin:$PATH"
           gradle --version
 
+      - name: Create debug keystore
+        script: |
+          keytool -genkeypair \
+            -v \
+            -keystore "$CM_BUILD_DIR/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Build Android APK
         script: |
           export GRADLE_HOME="$PWD/gradle-9.3.1"
           export PATH="$GRADLE_HOME/bin:$PATH"
+
           gradle assembleDebug
 
     artifacts:
