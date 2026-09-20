@@ -24,7 +24,7 @@ android {
         targetSdk = 36
 
         versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 2
-        versionName = System.getenv("VERSION_NAME") ?: "1.0.6"
+        versionName = System.getenv("VERSION_NAME") ?: "1.0.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
