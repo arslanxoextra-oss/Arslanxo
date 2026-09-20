@@ -32,50 +32,87 @@ android {
     signingConfigs {
         create("release") {
 
-            val keystorePath = System.getenv("CM_KEYSTORE_PATH")
+            val codemagicKeystorePath =
+                System.getenv("CM_KEYSTORE_PATH")
+
+            val customKeystorePath =
+                System.getenv("KEYSTORE_PATH")
+
+            val keystorePath =
+                codemagicKeystorePath
+                    ?: customKeystorePath
+
             val signingStorePassword =
                 System.getenv("CM_KEYSTORE_PASSWORD")
+                    ?: System.getenv("STORE_PASSWORD")
+
             val signingKeyAlias =
                 System.getenv("CM_KEY_ALIAS")
+                    ?: System.getenv("KEY_ALIAS")
+                    ?: "newapp-gzihyu"
+
             val signingKeyPassword =
                 System.getenv("CM_KEY_PASSWORD")
+                    ?: System.getenv("KEY_PASSWORD")
 
-            if (keystorePath.isNullOrBlank()) {
+            val localKeystore =
+                file("${rootDir}/my-upload-key.jks")
+
+            if (
+                !keystorePath.isNullOrBlank() &&
+                !signingStorePassword.isNullOrBlank() &&
+                !signingKeyPassword.isNullOrBlank()
+            ) {
+                val codemagicKeystore =
+                    file(keystorePath)
+
+                if (!codemagicKeystore.exists()) {
+                    throw GradleException(
+                        """
+                        Release keystore was not found.
+
+                        Path:
+                        $keystorePath
+
+                        Please check the Android keystore configuration
+                        in Codemagic.
+                        """.trimIndent()
+                    )
+                }
+
+                storeFile = codemagicKeystore
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+
+            } else if (
+                localKeystore.exists() &&
+                !signingStorePassword.isNullOrBlank() &&
+                !signingKeyPassword.isNullOrBlank()
+            ) {
+                storeFile = localKeystore
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+
+            } else {
                 throw GradleException(
-                    "CM_KEYSTORE_PATH is missing. Please configure the Android keystore in Codemagic."
+                    """
+                    Release signing configuration is missing.
+
+                    Please make sure the following are configured
+                    in Codemagic:
+
+                    CM_KEYSTORE_PATH
+                    CM_KEYSTORE_PASSWORD
+                    CM_KEY_ALIAS
+                    CM_KEY_PASSWORD
+
+                    Or make sure my-upload-key.jks exists in the
+                    project root with the correct signing credentials.
+                    """.trimIndent()
                 )
             }
-
-            if (signingStorePassword.isNullOrBlank()) {
-                throw GradleException(
-                    "CM_KEYSTORE_PASSWORD is missing. Please check Codemagic keystore settings."
-                )
-            }
-
-            if (signingKeyAlias.isNullOrBlank()) {
-                throw GradleException(
-                    "CM_KEY_ALIAS is missing. Please check Codemagic keystore settings."
-                )
-            }
-
-            if (signingKeyPassword.isNullOrBlank()) {
-                throw GradleException(
-                    "CM_KEY_PASSWORD is missing. Please check Codemagic keystore settings."
-                )
-            }
-
-            val keystoreFile = file(keystorePath)
-
-            if (!keystoreFile.exists()) {
-                throw GradleException(
-                    "Release signing keystore was not found at: $keystorePath"
-                )
-            }
-
-            storeFile = keystoreFile
-            storePassword = signingStorePassword
-            keyAlias = signingKeyAlias
-            keyPassword = signingKeyPassword
         }
 
         create("debugConfig") {
@@ -98,11 +135,13 @@ android {
                 "proguard-rules.pro"
             )
 
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig =
+                signingConfigs.getByName("release")
         }
 
         debug {
-            signingConfig = signingConfigs.getByName("debugConfig")
+            signingConfig =
+                signingConfigs.getByName("debugConfig")
         }
     }
 
