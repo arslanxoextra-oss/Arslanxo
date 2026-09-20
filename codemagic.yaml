@@ -5,6 +5,8 @@ workflows:
 
     environment:
       java: 17
+      android_signing:
+        - promptxo_upload_key
 
     scripts:
       - name: Install Gradle 9.3.1
@@ -43,6 +45,8 @@ workflows:
 
     environment:
       java: 17
+      android_signing:
+        - promptxo_upload_key
 
     scripts:
       - name: Install Gradle 9.3.1
