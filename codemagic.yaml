@@ -1,0 +1,25 @@
+workflows:
+  android-build:
+    name: Android Build
+    max_build_duration: 60
+
+    environment:
+      java: 17
+
+    scripts:
+      - name: Install Gradle 9.3.1
+        script: |
+          curl -L https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          export GRADLE_HOME="$PWD/gradle-9.3.1"
+          export PATH="$GRADLE_HOME/bin:$PATH"
+          gradle --version
+
+      - name: Build Android APK
+        script: |
+          export GRADLE_HOME="$PWD/gradle-9.3.1"
+          export PATH="$GRADLE_HOME/bin:$PATH"
+          gradle assembleDebug
+
+    artifacts:
+      - app/build/outputs/apk/debug/*.apk
