@@ -1,19 +1,17 @@
 workflows:
-  android-build:
-    name: Android Build
+  android-apk:
+    name: Android APK Build
     max_build_duration: 60
 
     environment:
       java: 17
 
     scripts:
-
       - name: Install Gradle 9.3.1
         script: |
-          curl -L https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o gradle.zip
-          unzip -q gradle.zip
-          export GRADLE_HOME="$PWD/gradle-9.3.1"
-          export PATH="$GRADLE_HOME/bin:$PATH"
+          wget https://services.gradle.org/distributions/gradle-9.3.1-bin.zip
+          unzip -q gradle-9.3.1-bin.zip
+          export PATH="$PWD/gradle-9.3.1/bin:$PATH"
           gradle --version
 
       - name: Create debug keystore
@@ -27,14 +25,51 @@ workflows:
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
+            -dname "CN=Android Debug,O=Android,C=US" \
+            || true
 
-      - name: Build Android APK
+      - name: Build Release APK
         script: |
-          export GRADLE_HOME="$PWD/gradle-9.3.1"
-          export PATH="$GRADLE_HOME/bin:$PATH"
-
-          gradle assembleDebug
+          export PATH="$PWD/gradle-9.3.1/bin:$PATH"
+          gradle assembleRelease
 
     artifacts:
-      - app/build/outputs/apk/debug/*.apk
+      - app/build/outputs/apk/release/*.apk
+
+
+  android-aab:
+    name: Android AAB Build
+    max_build_duration: 60
+
+    environment:
+      java: 17
+
+    scripts:
+      - name: Install Gradle 9.3.1
+        script: |
+          wget https://services.gradle.org/distributions/gradle-9.3.1-bin.zip
+          unzip -q gradle-9.3.1-bin.zip
+          export PATH="$PWD/gradle-9.3.1/bin:$PATH"
+          gradle --version
+
+      - name: Create debug keystore
+        script: |
+          keytool -genkeypair \
+            -v \
+            -keystore "$CM_BUILD_DIR/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            || true
+
+      - name: Build Release AAB
+        script: |
+          export PATH="$PWD/gradle-9.3.1/bin:$PATH"
+          gradle bundleRelease
+
+    artifacts:
+      - app/build/outputs/bundle/release/*.aab
