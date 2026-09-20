@@ -31,72 +31,73 @@ android {
 
     signingConfigs {
         create("release") {
-            /*
-             * Codemagic کے Android signing variables:
-             *
-             * CM_KEYSTORE_PATH
-             * CM_KEYSTORE_PASSWORD
-             * CM_KEY_ALIAS
-             * CM_KEY_PASSWORD
-             */
 
-            val codemagicKeystorePath =
-                System.getenv("CM_KEYSTORE_PATH")
+            val keystorePath = System.getenv("CM_KEYSTORE_PATH")
+            val keystorePassword = System.getenv("CM_KEYSTORE_PASSWORD")
+            val alias = System.getenv("CM_KEY_ALIAS")
+            val keyPassword = System.getenv("CM_KEY_PASSWORD")
 
-            val customKeystorePath =
-                System.getenv("KEYSTORE_PATH")
-
-            val keystorePath =
-                codemagicKeystorePath
-                    ?: customKeystorePath
-
-            val keystorePassword =
-                System.getenv("CM_KEYSTORE_PASSWORD")
-                    ?: System.getenv("STORE_PASSWORD")
-
-            val alias =
-                System.getenv("CM_KEY_ALIAS")
-                    ?: System.getenv("KEY_ALIAS")
-                    ?: "newapp-gzihyu"
-
-            val password =
-                System.getenv("CM_KEY_PASSWORD")
-                    ?: System.getenv("KEY_PASSWORD")
-
-            if (
-                !keystorePath.isNullOrBlank() &&
-                !keystorePassword.isNullOrBlank() &&
-                !password.isNullOrBlank() &&
-                file(keystorePath).exists()
-            ) {
-                storeFile = file(keystorePath)
-                storePassword = keystorePassword
-                keyAlias = alias
-                keyPassword = password
-            } else if (
-                file("${rootDir}/my-upload-key.jks").exists() &&
-                !keystorePassword.isNullOrBlank() &&
-                !password.isNullOrBlank()
-            ) {
-                storeFile = file("${rootDir}/my-upload-key.jks")
-                storePassword = keystorePassword
-                keyAlias = alias
-                keyPassword = password
-            } else {
+            if (keystorePath.isNullOrBlank()) {
                 throw GradleException(
                     """
-                    Release signing keystore نہیں ملی۔
+                    CM_KEYSTORE_PATH is missing.
 
-                    Codemagic میں یہ variables چیک کریں:
-                    CM_KEYSTORE_PATH
-                    CM_KEYSTORE_PASSWORD
-                    CM_KEY_ALIAS
-                    CM_KEY_PASSWORD
-
-                    اور یقینی بنائیں کہ اصل upload keystore موجود ہے۔
+                    Please make sure the Android keystore is configured
+                    in Codemagic Code signing settings.
                     """.trimIndent()
                 )
             }
+
+            if (keystorePassword.isNullOrBlank()) {
+                throw GradleException(
+                    """
+                    CM_KEYSTORE_PASSWORD is missing.
+
+                    Please check the keystore configuration in Codemagic.
+                    """.trimIndent()
+                )
+            }
+
+            if (alias.isNullOrBlank()) {
+                throw GradleException(
+                    """
+                    CM_KEY_ALIAS is missing.
+
+                    Please check the key alias in Codemagic.
+                    """.trimIndent()
+                )
+            }
+
+            if (keyPassword.isNullOrBlank()) {
+                throw GradleException(
+                    """
+                    CM_KEY_PASSWORD is missing.
+
+                    Please check the key password in Codemagic.
+                    """.trimIndent()
+                )
+            }
+
+            val keystoreFile = file(keystorePath)
+
+            if (!keystoreFile.exists()) {
+                throw GradleException(
+                    """
+                    Release signing keystore was not found.
+
+                    Expected keystore path:
+                    $keystorePath
+
+                    Please make sure the correct Android upload keystore
+                    is uploaded and selected in Codemagic Code signing.
+                    """.trimIndent()
+                )
+            }
+
+            storeFile = keystoreFile
+            storePassword = keystorePassword
+            keyAlias = alias
+            keyPassword = keyPassword
         }
 
         create("debugConfig") {
