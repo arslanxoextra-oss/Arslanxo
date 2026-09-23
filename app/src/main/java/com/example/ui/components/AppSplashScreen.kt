@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -68,17 +70,16 @@ fun AppSplashScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .size(96.dp)
+                    .size(68.dp)
                     .scale(scale)
-                    .clip(CircleShape)
-                    .background(Color(0xFF191D33)),
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_promptxo_logo),
+                Image(
+                    painter = painterResource(id = R.drawable.ic_promptxo_logo_img),
                     contentDescription = "PromptXo",
-                    tint = Color.Unspecified,
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(68.dp)
                 )
             }
 

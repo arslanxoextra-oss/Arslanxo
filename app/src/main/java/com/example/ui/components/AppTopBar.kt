@@ -1,7 +1,9 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,12 +48,19 @@ fun AppTopBar(
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_promptxo_logo),
-                contentDescription = "PromptXo Logo",
-                tint = Color.Unspecified,
-                modifier = Modifier.size(32.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_promptxo_logo_img),
+                    contentDescription = "PromptXo Logo",
+                    modifier = Modifier.size(36.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.width(10.dp))
 

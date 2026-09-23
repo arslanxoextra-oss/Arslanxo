@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +39,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import android.app.Activity
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import com.example.ads.AdManager
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,12 +64,40 @@ fun ImageDetailScreen(
     imagePost: ImagePost,
     viewModel: PromptXoViewModel,
     onNavigateBack: () -> Unit,
+    onSelectImagePost: (ImagePost) -> Unit = {},
+    onNavigateToImages: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
     val snackbarHostState = remember { SnackbarHostState() }
     val favorites by viewModel.imageFavorites.collectAsState()
     val isFav = favorites.any { it.id == imagePost.id }
+
+    val allImagePosts by viewModel.allImagePosts.collectAsState()
+    // Limit to 5 suggested image posts
+    val suggestedImages = remember(allImagePosts, imagePost.id) {
+        allImagePosts.filter { it.id != imagePost.id }.take(5)
+    }
+
+    val totalSliderItems = suggestedImages.size + 1
+    val suggestedImageListState = rememberLazyListState()
+
+    // Automatic smooth looping slider for suggested images
+    LaunchedEffect(suggestedImages) {
+        if (totalSliderItems > 1) {
+            while (true) {
+                delay(2500)
+                if (!suggestedImageListState.isScrollInProgress) {
+                    val nextIndex = (suggestedImageListState.firstVisibleItemIndex + 1) % totalSliderItems
+                    suggestedImageListState.animateScrollToItem(
+                        index = nextIndex,
+                        scrollOffset = 0
+                    )
+                }
+            }
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -195,7 +234,143 @@ fun ImageDetailScreen(
             // Native Ad Card
             NativeAdCard()
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Suggested Images Slider (Previous / other image prompts)
+            if (suggestedImages.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp, 18.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color(0xFF7C3AED))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Suggested Images",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                LazyRow(
+                    state = suggestedImageListState,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(suggestedImages, key = { it.id }) { item ->
+                        Box(
+                            modifier = Modifier
+                                .width(150.dp)
+                                .height(190.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFF141728))
+                                .border(1.dp, Color(0xFF242A44), RoundedCornerShape(14.dp))
+                                .clickable {
+                                    if (activity != null) {
+                                        AdManager.onPostClicked(activity) {
+                                            onSelectImagePost(item)
+                                        }
+                                    } else {
+                                        onSelectImagePost(item)
+                                    }
+                                }
+                        ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(item.displayThumbnail.ifBlank { "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80" })
+                                    .crossfade(200)
+                                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                                    .build(),
+                                contentDescription = item.displayTitle,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            // Title overlay gradient at bottom
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .align(Alignment.BottomCenter)
+                                    .background(Color(0xB3000000))
+                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = item.displayTitle,
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    // Load More card at the end in the exact same 150dp x 190dp shape
+                    item(key = "load_more_images_card") {
+                        Box(
+                            modifier = Modifier
+                                .width(150.dp)
+                                .height(190.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFF141728))
+                                .border(1.dp, Color(0xFF7C3AED), RoundedCornerShape(14.dp))
+                                .clickable {
+                                    onNavigateToImages()
+                                }
+                                .padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF7C3AED)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                        contentDescription = "Load More",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Text(
+                                    text = "Load More",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    text = "Explore Images",
+                                    color = Color(0xFFA78BFA),
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

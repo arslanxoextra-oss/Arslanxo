@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -69,16 +70,15 @@ fun AppDrawerContent(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(46.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF1B1F33)),
+                        .background(Color.Black),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_promptxo_logo),
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_promptxo_logo_img),
                         contentDescription = "PromptXo Logo",
-                        tint = Color.Unspecified,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(46.dp)
                     )
                 }
 
@@ -147,13 +147,6 @@ fun AppDrawerContent(
             )
 
             Spacer(modifier = Modifier.weight(1f))
-
-            Text(
-                text = "Version 1.0.0",
-                fontSize = 11.sp,
-                color = Color(0xFF475569),
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
         }
     }
 }

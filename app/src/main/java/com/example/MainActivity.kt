@@ -231,6 +231,13 @@ fun PromptXoApp(viewModel: PromptXoViewModel) {
                                 viewModel = viewModel,
                                 onNavigateBack = {
                                     currentDestination = AppDestination.MainTabs
+                                },
+                                onSelectPost = { nextPost ->
+                                    currentDestination = AppDestination.PostDetail(nextPost)
+                                },
+                                onNavigateToHome = {
+                                    currentTab = ScreenTab.Home
+                                    currentDestination = AppDestination.MainTabs
                                 }
                             )
                         }
@@ -243,6 +250,13 @@ fun PromptXoApp(viewModel: PromptXoViewModel) {
                                 imagePost = destination.imagePost,
                                 viewModel = viewModel,
                                 onNavigateBack = {
+                                    currentDestination = AppDestination.MainTabs
+                                },
+                                onSelectImagePost = { nextImage ->
+                                    currentDestination = AppDestination.ImageDetail(nextImage)
+                                },
+                                onNavigateToImages = {
+                                    currentTab = ScreenTab.Images
                                     currentDestination = AppDestination.MainTabs
                                 }
                             )

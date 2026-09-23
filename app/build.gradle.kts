@@ -96,22 +96,11 @@ android {
                 keyPassword = signingKeyPassword
 
             } else {
-                throw GradleException(
-                    """
-                    Release signing configuration is missing.
-
-                    Please make sure the following are configured
-                    in Codemagic:
-
-                    CM_KEYSTORE_PATH
-                    CM_KEYSTORE_PASSWORD
-                    CM_KEY_ALIAS
-                    CM_KEY_PASSWORD
-
-                    Or make sure my-upload-key.jks exists in the
-                    project root with the correct signing credentials.
-                    """.trimIndent()
-                )
+                // Fallback to debug.keystore for local development and Studio builds
+                storeFile = file("${rootDir}/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
             }
         }
 
