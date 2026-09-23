@@ -85,13 +85,19 @@ fun PromptXoApp(viewModel: PromptXoViewModel) {
     val posts by viewModel.allPosts.collectAsState()
     val imagePosts by viewModel.allImagePosts.collectAsState()
 
-    // Splash screen state: keep splash visible until Firebase data arrives (or up to 2.5s max fallback)
+    val isPreloadingDone by viewModel.isPreloadingDone.collectAsState()
+
+    // Splash screen state: keep splash visible until Firebase data AND image preloading completes
     var isSplashVisible by remember { mutableStateOf(true) }
 
-    LaunchedEffect(isLoading, posts, imagePosts) {
-        if (!isLoading && (posts.isNotEmpty() || imagePosts.isNotEmpty())) {
-            // Once Firebase has delivered posts, dismiss splash smoothly
-            delay(400)
+    LaunchedEffect(isLoading, isPreloadingDone, posts, imagePosts) {
+        if (!isLoading && isPreloadingDone) {
+            // Preload is fully complete in Coil cache, transition seamlessly
+            delay(150)
+            isSplashVisible = false
+        } else if (!isLoading && (posts.isNotEmpty() || imagePosts.isNotEmpty())) {
+            // If data is ready but preloading taking slightly longer, transition gracefully
+            delay(1200)
             isSplashVisible = false
         }
     }

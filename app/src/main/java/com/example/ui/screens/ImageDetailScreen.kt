@@ -139,10 +139,9 @@ fun ImageDetailScreen(
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(imagePost.displayThumbnail.ifBlank { "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80" })
-                        .crossfade(true)
-                        .placeholder(com.example.R.drawable.ic_image_placeholder)
-                        .error(com.example.R.drawable.ic_image_placeholder)
-                        .fallback(com.example.R.drawable.ic_image_placeholder)
+                        .crossfade(200)
+                        .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                        .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                         .build(),
                     contentDescription = imagePost.displayTitle,
                     contentScale = ContentScale.Crop,

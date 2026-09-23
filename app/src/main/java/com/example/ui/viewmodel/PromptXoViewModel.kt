@@ -39,34 +39,38 @@ class PromptXoViewModel(application: Application) : AndroidViewModel(application
     val policies: StateFlow<AppPolicies> = repository.policies
     val isLoading: StateFlow<Boolean> = repository.isLoading
 
-    init {
-        // Automatically preload initial image thumbnails into Coil cache
-        viewModelScope.launch(Dispatchers.IO) {
-            allPosts.collectLatest { posts ->
-                val loader = getApplication<Application>().imageLoader
-                posts.take(10).forEach { post ->
-                    val url = post.displayThumbnail
-                    if (url.isNotBlank()) {
-                        val req = ImageRequest.Builder(getApplication())
-                            .data(url)
-                            .build()
-                        loader.enqueue(req)
-                    }
-                }
-            }
-        }
+    private val _isPreloadingDone = MutableStateFlow(false)
+    val isPreloadingDone: StateFlow<Boolean> = _isPreloadingDone.asStateFlow()
 
+    init {
+        // Fast parallel preloading of initial posts and images thumbnails into Coil cache
         viewModelScope.launch(Dispatchers.IO) {
-            allImagePosts.collectLatest { images ->
-                val loader = getApplication<Application>().imageLoader
-                images.take(12).forEach { img ->
-                    val url = img.displayThumbnail
-                    if (url.isNotBlank()) {
-                        val req = ImageRequest.Builder(getApplication())
-                            .data(url)
-                            .build()
-                        loader.enqueue(req)
+            allPosts.combine(allImagePosts) { posts, images ->
+                Pair(posts, images)
+            }.collectLatest { (posts, images) ->
+                if (posts.isNotEmpty() || images.isNotEmpty()) {
+                    val loader = getApplication<Application>().imageLoader
+                    val postUrls = posts.take(10).mapNotNull { it.displayThumbnail.ifBlank { null } }
+                    val imageUrls = images.take(12).mapNotNull { it.displayThumbnail.ifBlank { null } }
+                    val allUrls = (postUrls + imageUrls).distinct()
+
+                    // Preload all thumbnails in parallel with concurrent requests
+                    allUrls.forEach { url ->
+                        launch(Dispatchers.IO) {
+                            val req = ImageRequest.Builder(getApplication())
+                                .data(url)
+                                .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                                .networkCachePolicy(coil.request.CachePolicy.ENABLED)
+                                .build()
+                            try {
+                                loader.execute(req)
+                            } catch (_: Exception) {
+                                loader.enqueue(req)
+                            }
+                        }
                     }
+                    _isPreloadingDone.value = true
                 }
             }
         }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ad-services-config>
+    <!-- Config to prevent unsupported AdServices calls on devices/emulators without the service -->
+    <attribution allowAdPartners="false" />
+    <topics allowAdPartners="false" />
+    <protected-audience allowAdPartners="false" />
+</ad-services-config>
