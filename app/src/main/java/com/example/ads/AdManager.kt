@@ -10,43 +10,58 @@ import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
+import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicInteger
 
+/**
+ * AdManager handles AdMob initialization, loading, and display of:
+ * - Native Advanced Ads
+ * - Rewarded Interstitial Ads (replacing standard interstitial)
+ * - Rewarded Ads
+ *
+ * Uses solely the user's authentic AdMob units without any test ads.
+ * App Open ads have been fully removed per user requirement.
+ */
 object AdManager {
     private const val TAG = "AdManager"
 
-    const val APP_ID = "ca-app-pub-8106043013088313~4327179238"
-    const val NATIVE_AD_ID = "ca-app-pub-8106043013088313/5440801967"
-    const val INTERSTITIAL_AD_ID = "ca-app-pub-8106043013088313/2147203021"
-    const val REWARDED_AD_ID = "ca-app-pub-8106043013088313/2881750523"
+    // =========================================================================
+    // Original AdMob Credentials provided by User
+    // =========================================================================
+    const val APP_ID = "ca-app-pub-8615333775681877~1241116749"
+    const val NATIVE_AD_ID = "ca-app-pub-8615333775681877/8792303703"
+    const val REWARDED_AD_ID = "ca-app-pub-8615333775681877/1368185813"
+    const val REWARDED_INTERSTITIAL_AD_ID = "ca-app-pub-8615333775681877/2665879053"
 
-    private var interstitialAd: InterstitialAd? = null
+    // Rewarded Interstitial Ad
+    private var rewardedInterstitialAd: RewardedInterstitialAd? = null
+    private var isRewardedInterstitialLoading = false
+
+    // Rewarded Ad
     private var rewardedAd: RewardedAd? = null
-    private var isInterstitialLoading = false
     private var isRewardedLoading = false
 
+    // Native Ad
     private val _currentNativeAd = MutableStateFlow<NativeAd?>(null)
     val currentNativeAd: StateFlow<NativeAd?> = _currentNativeAd.asStateFlow()
-
     private var isNativeLoading = false
 
-    // Post click counter for rhythmic interstitial display:
-    // 1st click = no ad, 2nd click = show ad, 3rd = no ad, 4th = show ad...
+    // Post click counter for rhythmic rewarded interstitial display:
+    // 1st click = open post without ad, 2nd click = show ad, 3rd = no ad, 4th = show ad...
     private val postClickCount = AtomicInteger(0)
 
     fun initialize(context: Context) {
         try {
             MobileAds.initialize(context) {
-                Log.d(TAG, "AdMob MobileAds initialized")
-                loadInterstitial(context)
+                Log.d(TAG, "AdMob MobileAds initialized with original IDs")
+                loadRewardedInterstitial(context)
                 loadRewarded(context)
                 loadNativeAd(context)
             }
@@ -55,6 +70,9 @@ object AdManager {
         }
     }
 
+    // ==========================================
+    // Native Ad Loader
+    // ==========================================
     fun loadNativeAd(context: Context) {
         if (isNativeLoading || _currentNativeAd.value != null) return
         isNativeLoading = true
@@ -64,13 +82,13 @@ object AdManager {
                 .forNativeAd { ad: NativeAd ->
                     _currentNativeAd.value = ad
                     isNativeLoading = false
-                    Log.d(TAG, "Native ad loaded successfully")
+                    Log.d(TAG, "Native ad loaded successfully ($NATIVE_AD_ID)")
                 }
                 .withAdListener(object : AdListener() {
                     override fun onAdFailedToLoad(adError: LoadAdError) {
                         _currentNativeAd.value = null
                         isNativeLoading = false
-                        Log.w(TAG, "Native ad failed to load: ${adError.message}")
+                        Log.w(TAG, "Native ad failed to load ($NATIVE_AD_ID): ${adError.message}")
                     }
                 })
                 .build()
@@ -82,31 +100,37 @@ object AdManager {
         }
     }
 
-    fun loadInterstitial(context: Context) {
-        if (interstitialAd != null || isInterstitialLoading) return
-        isInterstitialLoading = true
+    // ==========================================
+    // Rewarded Interstitial Ad Loader
+    // ==========================================
+    fun loadRewardedInterstitial(context: Context) {
+        if (rewardedInterstitialAd != null || isRewardedInterstitialLoading) return
+        isRewardedInterstitialLoading = true
 
         val adRequest = AdRequest.Builder().build()
-        InterstitialAd.load(
+        RewardedInterstitialAd.load(
             context,
-            INTERSTITIAL_AD_ID,
+            REWARDED_INTERSTITIAL_AD_ID,
             adRequest,
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: InterstitialAd) {
-                    interstitialAd = ad
-                    isInterstitialLoading = false
-                    Log.d(TAG, "Interstitial ad loaded successfully")
+            object : RewardedInterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: RewardedInterstitialAd) {
+                    rewardedInterstitialAd = ad
+                    isRewardedInterstitialLoading = false
+                    Log.d(TAG, "Rewarded Interstitial ad loaded successfully ($REWARDED_INTERSTITIAL_AD_ID)")
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
-                    interstitialAd = null
-                    isInterstitialLoading = false
-                    Log.w(TAG, "Interstitial ad failed to load: ${error.message}")
+                    rewardedInterstitialAd = null
+                    isRewardedInterstitialLoading = false
+                    Log.w(TAG, "Rewarded Interstitial ad failed to load ($REWARDED_INTERSTITIAL_AD_ID): ${error.message}")
                 }
             }
         )
     }
 
+    // ==========================================
+    // Standard Rewarded Ad Loader
+    // ==========================================
     fun loadRewarded(context: Context) {
         if (rewardedAd != null || isRewardedLoading) return
         isRewardedLoading = true
@@ -120,55 +144,53 @@ object AdManager {
                 override fun onAdLoaded(ad: RewardedAd) {
                     rewardedAd = ad
                     isRewardedLoading = false
-                    Log.d(TAG, "Rewarded ad loaded successfully")
+                    Log.d(TAG, "Rewarded ad loaded successfully ($REWARDED_AD_ID)")
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     rewardedAd = null
                     isRewardedLoading = false
-                    Log.w(TAG, "Rewarded ad failed to load: ${error.message}")
+                    Log.w(TAG, "Rewarded ad failed to load ($REWARDED_AD_ID): ${error.message}")
                 }
             }
         )
     }
 
     /**
-     * Checks whether this post click qualifies for an interstitial ad.
+     * Checks whether this post click qualifies for an ad.
      * Pattern: 1st click -> false, 2nd click -> true, 3rd -> false, 4th -> true
-     * Zero-delay guarantee: If no ad is loaded, opens post immediately with zero lag!
+     * Uses Rewarded Interstitial with original AdMob unit ID.
      */
     fun onPostClicked(activity: Activity, onAction: () -> Unit) {
         val count = postClickCount.incrementAndGet()
         val isAdTurn = (count % 2 == 0)
 
-        val ad = interstitialAd
+        val ad = rewardedInterstitialAd
         if (isAdTurn && ad != null) {
             ad.fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdDismissedFullScreenContent() {
-                    interstitialAd = null
-                    loadInterstitial(activity)
+                    rewardedInterstitialAd = null
+                    loadRewardedInterstitial(activity)
                     onAction()
                 }
 
                 override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    interstitialAd = null
-                    loadInterstitial(activity)
+                    rewardedInterstitialAd = null
+                    loadRewardedInterstitial(activity)
                     onAction()
                 }
             }
-            ad.show(activity)
+            ad.show(activity) { _ -> }
         } else {
-            // Immediate transition without delay
-            if (interstitialAd == null) {
-                loadInterstitial(activity)
+            if (rewardedInterstitialAd == null) {
+                loadRewardedInterstitial(activity)
             }
             onAction()
         }
     }
 
     /**
-     * Shows rewarded ad for copying prompt or loading more posts.
-     * Zero-delay guarantee: If ad is not ready, executes reward immediately without blocking the user!
+     * Shows rewarded ad for copying prompt or unlocking items / loading more.
      */
     fun showRewardedAd(activity: Activity, onReward: () -> Unit) {
         val currentAd = rewardedAd
@@ -186,12 +208,8 @@ object AdManager {
                     onReward()
                 }
             }
-
-            currentAd.show(activity) { _ ->
-                // Reward earned
-            }
+            currentAd.show(activity) { _ -> }
         } else {
-            // No ad available -> execute immediately with 0 wait time
             loadRewarded(activity)
             onReward()
         }

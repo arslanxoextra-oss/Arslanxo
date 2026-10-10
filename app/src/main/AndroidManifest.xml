@@ -19,7 +19,7 @@
 
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-8106043013088313~4327179238" />
+            android:value="ca-app-pub-8615333775681877~1241116749" />
 
         <!-- Disable AdServices Measurement to suppress emulator service unavailable logcat error -->
         <property

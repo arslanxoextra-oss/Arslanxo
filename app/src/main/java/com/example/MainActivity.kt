@@ -33,7 +33,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import com.example.ads.AdManager
 import com.example.model.ImagePost
 import com.example.model.Post
 import com.example.ui.components.AppBottomBar
@@ -60,12 +59,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Initialize AdMob
-        AdManager.initialize(this)
-
         setContent {
             MyApplicationTheme {
-                PromptXoApp(viewModel = viewModel)
+                PromptXoApp(
+                    viewModel = viewModel
+                )
             }
         }
     }
@@ -78,7 +76,10 @@ sealed class AppDestination {
 }
 
 @Composable
-fun PromptXoApp(viewModel: PromptXoViewModel) {
+fun PromptXoApp(
+    viewModel: PromptXoViewModel,
+    onSplashFinished: () -> Unit = {}
+) {
     val isOnline by viewModel.isOnline.collectAsState()
     val policies by viewModel.policies.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -94,18 +95,27 @@ fun PromptXoApp(viewModel: PromptXoViewModel) {
         if (!isLoading && isPreloadingDone) {
             // Preload is fully complete in Coil cache, transition seamlessly
             delay(150)
-            isSplashVisible = false
+            if (isSplashVisible) {
+                isSplashVisible = false
+                onSplashFinished()
+            }
         } else if (!isLoading && (posts.isNotEmpty() || imagePosts.isNotEmpty())) {
             // If data is ready but preloading taking slightly longer, transition gracefully
             delay(1200)
-            isSplashVisible = false
+            if (isSplashVisible) {
+                isSplashVisible = false
+                onSplashFinished()
+            }
         }
     }
 
     // Safety timeout: if device is offline or collection is empty, don't block forever
     LaunchedEffect(Unit) {
         delay(2500)
-        isSplashVisible = false
+        if (isSplashVisible) {
+            isSplashVisible = false
+            onSplashFinished()
+        }
     }
 
     if (isSplashVisible) {

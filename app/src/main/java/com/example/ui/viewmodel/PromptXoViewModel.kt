@@ -43,18 +43,19 @@ class PromptXoViewModel(application: Application) : AndroidViewModel(application
     val isPreloadingDone: StateFlow<Boolean> = _isPreloadingDone.asStateFlow()
 
     init {
-        // Fast parallel preloading of initial posts and images thumbnails into Coil cache
+        // Fast parallel preloading of posts and images thumbnails into Coil cache & disk
         viewModelScope.launch(Dispatchers.IO) {
             allPosts.combine(allImagePosts) { posts, images ->
                 Pair(posts, images)
             }.collectLatest { (posts, images) ->
                 if (posts.isNotEmpty() || images.isNotEmpty()) {
                     val loader = getApplication<Application>().imageLoader
-                    val postUrls = posts.take(10).mapNotNull { it.displayThumbnail.ifBlank { null } }
-                    val imageUrls = images.take(12).mapNotNull { it.displayThumbnail.ifBlank { null } }
+                    // Preload first 25 items so the user gets instant zero-wait image display
+                    val postUrls = posts.take(25).mapNotNull { it.displayThumbnail.ifBlank { null } }
+                    val imageUrls = images.take(25).mapNotNull { it.displayThumbnail.ifBlank { null } }
                     val allUrls = (postUrls + imageUrls).distinct()
 
-                    // Preload all thumbnails in parallel with concurrent requests
+                    // Preload in parallel with concurrent requests
                     allUrls.forEach { url ->
                         launch(Dispatchers.IO) {
                             val req = ImageRequest.Builder(getApplication())
@@ -62,6 +63,7 @@ class PromptXoViewModel(application: Application) : AndroidViewModel(application
                                 .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
                                 .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                                 .networkCachePolicy(coil.request.CachePolicy.ENABLED)
+                                .allowHardware(true)
                                 .build()
                             try {
                                 loader.execute(req)
