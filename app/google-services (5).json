@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "1051578631700",
+    "project_id": "you-prompt-27a23",
+    "storage_bucket": "you-prompt-27a23.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1051578631700:android:d63b8a54440eef01008901",
+        "android_client_info": {
+          "package_name": "com.arslanaziz.promptxo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1051578631700-363hmsmhg9t54png9aapj7s1kan34lm5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.arslanaziz.promptxo",
+            "certificate_hash": "9bbb3186b2189ef16d8f272bdab59362c395cbb4"
+          }
+        },
+        {
+          "client_id": "1051578631700-hkkqs3g5mhtp9ro1fkveokue4k61s9fj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBN1rmudcsLXCD6V4a8_lo1RqWX5NR8Rg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1051578631700-hkkqs3g5mhtp9ro1fkveokue4k61s9fj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1051578631700-5djvff9jer06bgjjlj1t136ahbghuh4p.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.promptxoApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1051578631700:android:169f6d8122577721008901",
+        "android_client_info": {
+          "package_name": "com.mycompany.newapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1051578631700-hkkqs3g5mhtp9ro1fkveokue4k61s9fj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBN1rmudcsLXCD6V4a8_lo1RqWX5NR8Rg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1051578631700-hkkqs3g5mhtp9ro1fkveokue4k61s9fj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1051578631700-5djvff9jer06bgjjlj1t136ahbghuh4p.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.promptxoApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
