@@ -35,5 +35,24 @@ class ExampleUnitTest {
     assertEquals("mid", sorted[1].id)
     assertEquals("old", sorted[2].id)
   }
-}
 
+  @Test
+  fun testAdConfigParsing() {
+    val sampleData = mapOf<String, Any?>(
+      "appId" to "ca-app-pub-8615333775681877~1241116749",
+      "enabled" to true,
+      "industrial" to "ca-app-pub-test/interstitial_123",
+      "divided" to "ca-app-pub-test/rewarded_456",
+      "Native advanced" to "ca-app-pub-test/native_789"
+    )
+
+    val config = com.example.ads.AdConfigRepository.parseDocumentData(sampleData)
+
+    assertEquals("ca-app-pub-8615333775681877~1241116749", config.appId)
+    assertTrue(config.isAdsEnabled)
+    assertEquals("ca-app-pub-test/interstitial_123", config.interstitialAdUnitId)
+    assertEquals("ca-app-pub-test/rewarded_456", config.rewardedAdUnitId)
+    assertEquals("ca-app-pub-test/native_789", config.nativeAdUnitId)
+    assertTrue(config.hasAnyAdUnit)
+  }
+}

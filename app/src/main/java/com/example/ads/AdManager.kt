@@ -10,85 +10,171 @@ import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
-import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
-import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * AdManager handles AdMob initialization, loading, and display of:
- * - Native Advanced Ads
- * - Rewarded Interstitial Ads (replacing standard interstitial)
- * - Rewarded Ads
+ * AdManager handles dynamic AdMob configuration loaded from Firebase Firestore (Settings/admob),
+ * initialization, caching, and display of the 3 specified formats:
+ * 1. Native advanced (Native ad)
+ * 2. Interstitial (Industrial ad - replaces rewarded interstitial)
+ * 3. Rewarded (Divided ad)
  *
- * Uses solely the user's authentic AdMob units without any test ads.
- * App Open ads have been fully removed per user requirement.
+ * All editable Ad Unit IDs are fetched dynamically from Firebase and are never hardcoded.
  */
 object AdManager {
     private const val TAG = "AdManager"
 
-    // =========================================================================
-    // Original AdMob Credentials provided by User
-    // =========================================================================
+    // Retained in native Android configuration per instructions
     const val APP_ID = "ca-app-pub-8615333775681877~1241116749"
-    const val NATIVE_AD_ID = "ca-app-pub-8615333775681877/8792303703"
-    const val REWARDED_AD_ID = "ca-app-pub-8615333775681877/1368185813"
-    const val REWARDED_INTERSTITIAL_AD_ID = "ca-app-pub-8615333775681877/2665879053"
 
-    // Rewarded Interstitial Ad
-    private var rewardedInterstitialAd: RewardedInterstitialAd? = null
-    private var isRewardedInterstitialLoading = false
+    // Active AdMob configuration (reactive flow)
+    private val _adConfig = MutableStateFlow(AdConfig())
+    val adConfig: StateFlow<AdConfig> = _adConfig.asStateFlow()
 
-    // Rewarded Ad
+    // 1. Standard Interstitial Ad (Industrial Ad)
+    private var interstitialAd: InterstitialAd? = null
+    private var isInterstitialLoading = false
+
+    // 2. Rewarded Ad (Divided Ad)
     private var rewardedAd: RewardedAd? = null
     private var isRewardedLoading = false
 
-    // Native Ad
+    // 3. Native Advanced Ad
     private val _currentNativeAd = MutableStateFlow<NativeAd?>(null)
     val currentNativeAd: StateFlow<NativeAd?> = _currentNativeAd.asStateFlow()
     private var isNativeLoading = false
 
-    // Post click counter for rhythmic rewarded interstitial display:
+    // Post click counter for rhythmic interstitial display (joori / paired):
     // 1st click = open post without ad, 2nd click = show ad, 3rd = no ad, 4th = show ad...
     private val postClickCount = AtomicInteger(0)
 
+    private var isMobileAdsInitialized = false
+    private var appContext: Context? = null
+
+    /**
+     * Initializes AdMob with local cache first for zero-delay startup,
+     * then subscribes to Firestore Settings/admob for real-time updates.
+     */
     fun initialize(context: Context) {
+        appContext = context.applicationContext
+
+        // 1. Immediately read cached configuration (offline-ready, instant startup)
+        val cachedConfig = AdConfigRepository.loadFromCache(context)
+        _adConfig.value = cachedConfig
+        Log.d(TAG, "AdMob loaded initial cached config: isAdsEnabled=${cachedConfig.isAdsEnabled}, hasUnits=${cachedConfig.hasAnyAdUnit}")
+
+        // 2. Initialize MobileAds SDK
         try {
-            MobileAds.initialize(context) {
-                Log.d(TAG, "AdMob MobileAds initialized with original IDs")
-                loadRewardedInterstitial(context)
-                loadRewarded(context)
-                loadNativeAd(context)
+            MobileAds.initialize(context) { status ->
+                Log.d(TAG, "AdMob MobileAds SDK initialized successfully: $status")
+                isMobileAdsInitialized = true
+                if (_adConfig.value.isAdsEnabled) {
+                    preloadConfiguredAds(context)
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing AdMob", e)
+            Log.e(TAG, "Error initializing MobileAds SDK", e)
+        }
+
+        // 3. Listen to Firestore Settings/admob dynamically (live sync from Firebase)
+        AdConfigRepository.listenToConfig(context) { newConfig ->
+            onConfigUpdated(newConfig)
         }
     }
 
+    /**
+     * Invoked whenever Firestore Settings/admob produces a new configuration snapshot.
+     */
+    fun onConfigUpdated(newConfig: AdConfig) {
+        val oldConfig = _adConfig.value
+        _adConfig.value = newConfig
+        Log.d(TAG, "Dynamic AdMob configuration updated from Firestore: native=${newConfig.nativeAdUnitId}, inter=${newConfig.interstitialAdUnitId}, rewarded=${newConfig.rewardedAdUnitId}")
+
+        val ctx = appContext ?: return
+
+        if (!newConfig.isAdsEnabled) {
+            // Disabled: release in-memory ads
+            interstitialAd = null
+            rewardedAd = null
+            _currentNativeAd.value = null
+            Log.d(TAG, "Ads disabled in Settings/admob. In-memory ads cleared.")
+            return
+        }
+
+        // If ads are enabled, reload ads whenever IDs change
+        if (isMobileAdsInitialized) {
+            // Native ad update
+            val nativeChanged = oldConfig.nativeAdUnitId != newConfig.nativeAdUnitId
+            if (nativeChanged || _currentNativeAd.value == null) {
+                _currentNativeAd.value = null
+                isNativeLoading = false
+                if (newConfig.nativeAdUnitId.isNotBlank()) {
+                    loadNativeAd(ctx)
+                }
+            }
+
+            // Interstitial (industrial) ad update
+            val interstitialChanged = oldConfig.interstitialAdUnitId != newConfig.interstitialAdUnitId
+            if (interstitialChanged || interstitialAd == null) {
+                interstitialAd = null
+                isInterstitialLoading = false
+                if (newConfig.interstitialAdUnitId.isNotBlank()) {
+                    loadInterstitial(ctx)
+                }
+            }
+
+            // Rewarded (divided) ad update - force reset so it always loads newly assigned ID
+            val rewardedChanged = oldConfig.rewardedAdUnitId != newConfig.rewardedAdUnitId
+            if (rewardedChanged || rewardedAd == null) {
+                rewardedAd = null
+                isRewardedLoading = false
+                if (newConfig.rewardedAdUnitId.isNotBlank()) {
+                    loadRewarded(ctx)
+                }
+            }
+        }
+    }
+
+    private fun preloadConfiguredAds(context: Context) {
+        if (!_adConfig.value.isAdsEnabled) return
+        loadNativeAd(context)
+        loadInterstitial(context)
+        loadRewarded(context)
+    }
+
     // ==========================================
-    // Native Ad Loader
+    // 1. Native Advanced Ad Loader
     // ==========================================
     fun loadNativeAd(context: Context) {
+        val config = _adConfig.value
+        if (!config.isAdsEnabled) return
+
+        val adUnitId = config.nativeAdUnitId.trim()
+        if (adUnitId.isBlank()) return
+
         if (isNativeLoading || _currentNativeAd.value != null) return
         isNativeLoading = true
 
         try {
-            val adLoader = AdLoader.Builder(context, NATIVE_AD_ID)
+            val adLoader = AdLoader.Builder(context, adUnitId)
                 .forNativeAd { ad: NativeAd ->
                     _currentNativeAd.value = ad
                     isNativeLoading = false
-                    Log.d(TAG, "Native ad loaded successfully ($NATIVE_AD_ID)")
+                    Log.d(TAG, "Native ad loaded successfully ($adUnitId)")
                 }
                 .withAdListener(object : AdListener() {
                     override fun onAdFailedToLoad(adError: LoadAdError) {
                         _currentNativeAd.value = null
                         isNativeLoading = false
-                        Log.w(TAG, "Native ad failed to load ($NATIVE_AD_ID): ${adError.message}")
+                        Log.w(TAG, "Native ad failed to load ($adUnitId): ${adError.message}")
                     }
                 })
                 .build()
@@ -96,106 +182,151 @@ object AdManager {
             adLoader.loadAd(AdRequest.Builder().build())
         } catch (e: Exception) {
             isNativeLoading = false
-            Log.e(TAG, "Failed to build AdLoader", e)
+            Log.e(TAG, "Failed to build or load NativeAd ($adUnitId)", e)
         }
     }
 
     // ==========================================
-    // Rewarded Interstitial Ad Loader
+    // 2. Interstitial Ad Loader (Industrial Ad)
     // ==========================================
-    fun loadRewardedInterstitial(context: Context) {
-        if (rewardedInterstitialAd != null || isRewardedInterstitialLoading) return
-        isRewardedInterstitialLoading = true
+    fun loadInterstitial(context: Context) {
+        val config = _adConfig.value
+        if (!config.isAdsEnabled) return
 
-        val adRequest = AdRequest.Builder().build()
-        RewardedInterstitialAd.load(
-            context,
-            REWARDED_INTERSTITIAL_AD_ID,
-            adRequest,
-            object : RewardedInterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: RewardedInterstitialAd) {
-                    rewardedInterstitialAd = ad
-                    isRewardedInterstitialLoading = false
-                    Log.d(TAG, "Rewarded Interstitial ad loaded successfully ($REWARDED_INTERSTITIAL_AD_ID)")
-                }
+        val adUnitId = config.interstitialAdUnitId.trim()
+        if (adUnitId.isBlank()) return
 
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    rewardedInterstitialAd = null
-                    isRewardedInterstitialLoading = false
-                    Log.w(TAG, "Rewarded Interstitial ad failed to load ($REWARDED_INTERSTITIAL_AD_ID): ${error.message}")
+        if (interstitialAd != null || isInterstitialLoading) return
+        isInterstitialLoading = true
+
+        try {
+            val adRequest = AdRequest.Builder().build()
+            InterstitialAd.load(
+                context,
+                adUnitId,
+                adRequest,
+                object : InterstitialAdLoadCallback() {
+                    override fun onAdLoaded(ad: InterstitialAd) {
+                        interstitialAd = ad
+                        isInterstitialLoading = false
+                        Log.d(TAG, "Interstitial (industrial) ad loaded successfully ($adUnitId)")
+                    }
+
+                    override fun onAdFailedToLoad(error: LoadAdError) {
+                        interstitialAd = null
+                        isInterstitialLoading = false
+                        Log.w(TAG, "Interstitial (industrial) ad failed to load ($adUnitId): ${error.message}")
+                    }
                 }
-            }
-        )
+            )
+        } catch (e: Exception) {
+            isInterstitialLoading = false
+            Log.e(TAG, "Failed to load InterstitialAd ($adUnitId)", e)
+        }
     }
 
     // ==========================================
-    // Standard Rewarded Ad Loader
+    // 3. Rewarded Ad Loader (Divided Ad)
     // ==========================================
     fun loadRewarded(context: Context) {
+        val config = _adConfig.value
+        if (!config.isAdsEnabled) return
+
+        val adUnitId = config.rewardedAdUnitId.trim()
+        if (adUnitId.isBlank()) return
+
         if (rewardedAd != null || isRewardedLoading) return
         isRewardedLoading = true
 
-        val adRequest = AdRequest.Builder().build()
-        RewardedAd.load(
-            context,
-            REWARDED_AD_ID,
-            adRequest,
-            object : RewardedAdLoadCallback() {
-                override fun onAdLoaded(ad: RewardedAd) {
-                    rewardedAd = ad
-                    isRewardedLoading = false
-                    Log.d(TAG, "Rewarded ad loaded successfully ($REWARDED_AD_ID)")
-                }
+        try {
+            val adRequest = AdRequest.Builder().build()
+            RewardedAd.load(
+                context,
+                adUnitId,
+                adRequest,
+                object : RewardedAdLoadCallback() {
+                    override fun onAdLoaded(ad: RewardedAd) {
+                        rewardedAd = ad
+                        isRewardedLoading = false
+                        Log.d(TAG, "Rewarded (divided) ad loaded successfully ($adUnitId)")
+                    }
 
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    rewardedAd = null
-                    isRewardedLoading = false
-                    Log.w(TAG, "Rewarded ad failed to load ($REWARDED_AD_ID): ${error.message}")
+                    override fun onAdFailedToLoad(error: LoadAdError) {
+                        rewardedAd = null
+                        isRewardedLoading = false
+                        Log.w(TAG, "Rewarded (divided) ad failed to load ($adUnitId): ${error.message}")
+                    }
                 }
-            }
-        )
+            )
+        } catch (e: Exception) {
+            isRewardedLoading = false
+            Log.e(TAG, "Failed to load RewardedAd ($adUnitId)", e)
+        }
     }
 
     /**
-     * Checks whether this post click qualifies for an ad.
-     * Pattern: 1st click -> false, 2nd click -> true, 3rd -> false, 4th -> true
-     * Uses Rewarded Interstitial with original AdMob unit ID.
+     * Paired (Joori) Post Click Ad using standard Interstitial (Industrial) ad:
+     * Pattern: 1st click = direct, 2nd click = Interstitial ad, 3rd = direct, 4th = ad.
+     * If the ad is not ready on the 2nd click, the turn is preserved so the user gets the exact paired experience.
      */
     fun onPostClicked(activity: Activity, onAction: () -> Unit) {
+        if (!_adConfig.value.isAdsEnabled || _adConfig.value.interstitialAdUnitId.isBlank()) {
+            onAction()
+            return
+        }
+
         val count = postClickCount.incrementAndGet()
         val isAdTurn = (count % 2 == 0)
 
-        val ad = rewardedInterstitialAd
+        val ad = interstitialAd
         if (isAdTurn && ad != null) {
             ad.fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdDismissedFullScreenContent() {
-                    rewardedInterstitialAd = null
-                    loadRewardedInterstitial(activity)
+                    interstitialAd = null
+                    loadInterstitial(activity)
                     onAction()
                 }
 
                 override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    rewardedInterstitialAd = null
-                    loadRewardedInterstitial(activity)
+                    interstitialAd = null
+                    loadInterstitial(activity)
                     onAction()
                 }
             }
-            ad.show(activity) { _ -> }
+            try {
+                ad.show(activity)
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception showing InterstitialAd", e)
+                interstitialAd = null
+                loadInterstitial(activity)
+                onAction()
+            }
         } else {
-            if (rewardedInterstitialAd == null) {
-                loadRewardedInterstitial(activity)
+            if (isAdTurn && ad == null) {
+                // If it was the 2nd click turn but ad was still loading, preserve the ad turn
+                postClickCount.decrementAndGet()
+                loadInterstitial(activity)
+            } else if (interstitialAd == null) {
+                loadInterstitial(activity)
             }
             onAction()
         }
     }
 
     /**
-     * Shows rewarded ad for copying prompt or unlocking items / loading more.
+     * Shows Rewarded (Divided) Ad for copying prompt or unlocking items / loading more.
+     * Guaranteed to use the live Firebase rewarded ad unit.
      */
     fun showRewardedAd(activity: Activity, onReward: () -> Unit) {
-        val currentAd = rewardedAd
-        if (currentAd != null) {
-            currentAd.fullScreenContentCallback = object : FullScreenContentCallback() {
+        if (!_adConfig.value.isAdsEnabled || _adConfig.value.rewardedAdUnitId.isBlank()) {
+            onReward()
+            return
+        }
+
+        val currentRewarded = rewardedAd
+
+        if (currentRewarded != null) {
+            currentRewarded.fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdDismissedFullScreenContent() {
                     rewardedAd = null
                     loadRewarded(activity)
@@ -208,8 +339,16 @@ object AdManager {
                     onReward()
                 }
             }
-            currentAd.show(activity) { _ -> }
+            try {
+                currentRewarded.show(activity) { _ -> }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception showing RewardedAd", e)
+                rewardedAd = null
+                loadRewarded(activity)
+                onReward()
+            }
         } else {
+            // Trigger load for next time and let the action complete seamlessly
             loadRewarded(activity)
             onReward()
         }

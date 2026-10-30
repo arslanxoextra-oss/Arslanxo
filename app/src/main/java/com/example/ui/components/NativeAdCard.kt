@@ -26,9 +26,12 @@ import com.google.android.gms.ads.nativead.NativeAdView
 fun NativeAdCard(
     modifier: Modifier = Modifier
 ) {
+    val adConfig by AdManager.adConfig.collectAsState()
+    if (!adConfig.isAdsEnabled) return
+
     val nativeAd by AdManager.currentNativeAd.collectAsState()
 
-    // Collapse space completely if no real ad is loaded
+    // Collapse space completely if no ad is loaded - never show any error or waiting text to the user
     val ad = nativeAd ?: return
 
     Box(
